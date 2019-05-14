@@ -109,16 +109,23 @@ template_rule(
 )
 
 # A common library that all LLVM targets depend on.
+# TODO(b/113996071): We need to glob all potentially #included files and stage
+# them here because LLVM's build files are not strict headers clean, and remote
+# build execution requires all inputs to be depended upon.
 cc_library(
     name = "config",
-    hdrs = [
+    hdrs = glob([
+        "**/*.h",
+        "**/*.def",
+        "**/*.inc.cpp",
+    ]) + [
         "include/llvm/Config/AsmParsers.def",
         "include/llvm/Config/AsmPrinters.def",
         "include/llvm/Config/Disassemblers.def",
         "include/llvm/Config/Targets.def",
-        "include/llvm/Config/abi-breaking.h",
         "include/llvm/Config/config.h",
         "include/llvm/Config/llvm-config.h",
+        "include/llvm/Config/abi-breaking.h",
     ],
     defines = llvm_defines,
     includes = ["include"],
@@ -639,6 +646,7 @@ cc_library(
         ":amdgpu_asm_printer",
         ":amdgpu_info",
         ":amdgpu_utils",
+        ":binary_format",
         ":config",
         ":core",
         ":mc",
@@ -711,6 +719,7 @@ cc_library(
     deps = [
         ":amdgpu_r600_target_gen",
         ":amdgpu_target_gen",
+        ":binary_format",
         ":config",
         ":core",
         ":mc",
@@ -786,12 +795,14 @@ cc_library(
         ":amdgpu_utils",
         ":analysis",
         ":asm_printer",
+        ":binary_format",
         ":code_gen",
         ":config",
         ":core",
         ":global_i_sel",
         ":ipo",
         ":mc",
+        ":mir_parser",
         ":scalar",
         ":selection_dag",
         ":support",
@@ -816,6 +827,7 @@ cc_library(
     ]),
     copts = llvm_copts + ["-Iexternal/llvm/lib/Target/ARM"],
     deps = [
+        ":arm_asm_printer",
         ":arm_desc",
         ":arm_info",
         ":arm_utils",
@@ -1029,6 +1041,7 @@ cc_library(
         ":config",
         ":core",
         ":debug_info_code_view",
+        ":debug_info_dwarf",
         ":debug_info_msf",
         ":mc",
         ":mc_parser",
@@ -1190,6 +1203,29 @@ cc_library(
         ":binary_format",
         ":config",
         ":debug_info_msf",
+        ":support",
+    ],
+)
+
+cc_library(
+    name = "debug_info_dwarf",
+    srcs = glob([
+        "lib/DebugInfo/DWARF/*.c",
+        "lib/DebugInfo/DWARF/*.cpp",
+        "lib/DebugInfo/DWARF/*.inc",
+        "lib/DebugInfo/DWARF/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/DebugInfo/DWARF/*.h",
+        "include/llvm/DebugInfo/DWARF/*.def",
+        "include/llvm/DebugInfo/DWARF/*.inc",
+    ]),
+    copts = llvm_copts,
+    deps = [
+        ":binary_format",
+        ":config",
+        ":mc",
+        ":object",
         ":support",
     ],
 )
@@ -1478,6 +1514,32 @@ cc_library(
         ":config",
         ":mc",
         ":support",
+    ],
+)
+
+cc_library(
+    name = "mir_parser",
+    srcs = glob([
+        "lib/CodeGen/MIRParser/*.c",
+        "lib/CodeGen/MIRParser/*.cpp",
+        "lib/CodeGen/MIRParser/*.inc",
+        "lib/CodeGen/MIRParser/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/CodeGen/MIRParser/*.h",
+        "include/llvm/CodeGen/MIRParser/*.def",
+        "include/llvm/CodeGen/MIRParser/*.inc",
+    ]),
+    copts = llvm_copts,
+    deps = [
+        ":asm_parser",
+        ":binary_format",
+        ":code_gen",
+        ":config",
+        ":core",
+        ":mc",
+        ":support",
+        ":target",
     ],
 )
 
@@ -1942,7 +2004,7 @@ cc_library(
         "include/llvm/BinaryFormat/COFF.h",
         "include/llvm/BinaryFormat/MachO.h",
         "lib/Support/*.h",
-    ] + llvm_support_platform_specific_srcs_glob),
+    ]) + llvm_support_platform_specific_srcs_glob(),
     hdrs = glob([
         "include/llvm/Support/*.h",
         "include/llvm/Support/*.def",
@@ -2134,6 +2196,7 @@ cc_library(
         ":core",
         ":global_i_sel",
         ":mc",
+        ":profile_data",
         ":selection_dag",
         ":support",
         ":target",
@@ -2232,7 +2295,6 @@ cc_library(
     deps = [
         ":code_gen",
         ":config",
-        ":core",
         ":support",
     ],
 )

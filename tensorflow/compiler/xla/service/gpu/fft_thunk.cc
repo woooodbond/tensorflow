@@ -17,11 +17,11 @@ limitations under the License.
 
 #include <string>
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "tensorflow/compiler/xla/service/gpu/hlo_execution_profiler.h"
 #include "tensorflow/compiler/xla/types.h"
 #include "tensorflow/compiler/xla/util.h"
-#include "tensorflow/core/lib/strings/strcat.h"
-#include "tensorflow/core/lib/strings/stringprintf.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/stream_executor_no_cuda.h"
 
@@ -29,7 +29,7 @@ namespace xla {
 namespace gpu {
 
 FftScratchAllocator::FftScratchAllocator(
-    int device_ordinal, DeviceMemoryAllocator* memory_allocator)
+    int device_ordinal, se::DeviceMemoryAllocator* memory_allocator)
     : device_ordinal_(device_ordinal), memory_allocator_(memory_allocator) {}
 
 int64 FftScratchAllocator::GetMemoryLimitInBytes(se::Stream* stream) {
@@ -43,12 +43,12 @@ StatusOr<se::DeviceMemory<uint8>> FftScratchAllocator::AllocateBytes(
   if (byte_size > GetMemoryLimitInBytes(stream)) {
     return se::port::Status(
         se::port::error::RESOURCE_EXHAUSTED,
-        tensorflow::strings::Printf(
-            "Allocating %lld bytes exceeds the memory limit of %lld bytes.",
+        absl::StrFormat(
+            "Allocating %d bytes exceeds the memory limit of %d bytes.",
             byte_size, GetMemoryLimitInBytes(stream)));
   }
 
-  TF_ASSIGN_OR_RETURN(OwningDeviceMemory allocated_buffer,
+  TF_ASSIGN_OR_RETURN(se::OwningDeviceMemory allocated_buffer,
                       memory_allocator_->Allocate(device_ordinal_, byte_size,
                                                   /*retry_on_failure=*/false));
   total_allocated_bytes_ += byte_size;
@@ -92,8 +92,7 @@ string FftTypeToString(se::fft::Type type) {
 
 }  // namespace
 
-FftThunk::FftThunk(FftType fft_type,
-                   tensorflow::gtl::ArraySlice<int64> fft_length,
+FftThunk::FftThunk(FftType fft_type, absl::Span<const int64> fft_length,
                    const BufferAllocation::Slice& input_buffer,
                    const BufferAllocation::Slice& output_buffer,
                    const Shape& input_shape, const Shape& output_shape,
@@ -213,7 +212,7 @@ Status FftThunk::ExecuteOnStream(const BufferAllocations& buffer_allocations,
     return Status::OK();
   }
   return InternalError("Unable to launch fft for thunk %p with type %s", this,
-                       FftTypeToString(fft_type_).c_str());
+                       FftTypeToString(fft_type_));
 }
 
 }  // namespace gpu

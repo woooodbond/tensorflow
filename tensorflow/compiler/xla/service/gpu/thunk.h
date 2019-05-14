@@ -41,21 +41,25 @@ class GpuExecutable;
 // This is thread-compatible.
 class Thunk {
  public:
-  enum class Kind {
+  enum Kind {
+    kCholesky,
     kConditional,
     kConvolution,
     kCopy,
     kCudnnBatchNormBackward,
     kCudnnBatchNormForwardInference,
     kCudnnBatchNormForwardTraining,
+    kCustomCall,
     kFft,
     kGemm,
     kInfeed,
     kKernel,
     kMemset32BitValue,
     kMemzero,
+    kNcclAllReduce,
     kOutfeed,
     kSequential,
+    kTriangularSolve,
     kTuple,
     kWhile,
   };
@@ -82,18 +86,6 @@ class Thunk {
     return Status::OK();
   }
 
-  // Users of Thunk should call ShouldHaltAllActivityBeforeRunning(stream)
-  // before calling ExecuteOnStream(stream).  If it returns true, it's the
-  // user's responsibility to wait for all activity on the GPU to finish before
-  // calling ExecuteOnStream.
-  //
-  // This value is not required to be constant for a given Thunk.  For example,
-  // a Thunk that performs autotuning may return true for its first run and
-  // false thereafter.
-  virtual bool ShouldHaltAllActivityBeforeRunning(se::Stream* /*stream*/) {
-    return false;
-  }
-
   // Execute the kernel for the thunk on the given stream. This method must be
   // called after Initialize and can be called multiple times over Thunk's
   // lifetime. 'stream' and 'profiler' must be non-null.
@@ -103,6 +95,11 @@ class Thunk {
                                  se::Stream* stream,
                                  HloExecutionProfiler* profiler) = 0;
 
+ protected:
+  const HloModuleConfig& GetModuleConfig() const {
+    return hlo_instruction()->GetModule()->config();
+  }
+
  private:
   Kind kind_;
   const HloInstruction* hlo_instruction_;
@@ -110,6 +107,9 @@ class Thunk {
 
 // A sequence of thunks.
 using ThunkSequence = std::vector<std::unique_ptr<Thunk>>;
+
+absl::string_view ThunkKindToString(Thunk::Kind);
+std::ostream& operator<<(std::ostream& os, Thunk::Kind kind);
 
 }  // namespace gpu
 }  // namespace xla
